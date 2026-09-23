@@ -192,8 +192,8 @@ pub fn maskLowBits(count: u5) u32 {
 
 pub fn maskHighBits(count: u5) u32 {
     if (count == 0) return 0;
-    if (count >= 32) return MAX;
-    return ~((@as(u32, 1) << (32 - count)) - 1);
+    const shift: u5 = @intCast(32 - @as(u6, count));
+    return ~((@as(u32, 1) << shift) - 1);
 }
 
 test "constants" {
@@ -283,7 +283,7 @@ test "min max clamp compare" {
     try std.testing.expectEqual(@as(u32, 1), min(1, 2));
     try std.testing.expectEqual(@as(u32, 2), max(1, 2));
     try std.testing.expectEqual(@as(u32, 5), clamp(5, 0, 10));
-    try std.testing.expectEqual(@as(u32, 0), clamp(15, 0, 10));
+    try std.testing.expectEqual(@as(u32, 10), clamp(15, 0, 10));
     try std.testing.expectEqual(std.math.Order.lt, compare(1, 2));
 }
 

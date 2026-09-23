@@ -82,12 +82,8 @@ pub fn parseF64(s: []const u8) ParseError!f64 {
         }
     }
 
-    return std.fmt.parseFloat(f64, slice) catch |err| switch (err) {
-        error.InvalidCharacter => ParseError.InvalidCharacter,
-        else => ParseError.InvalidFormat,
-    };
+    return std.fmt.parseFloat(f64, slice) catch ParseError.InvalidCharacter;
 }
-
 pub fn parseHexF64(s: []const u8) ParseError!f64 {
     if (s.len == 0) return ParseError.NoDigits;
     var value: f64 = 0;
@@ -117,8 +113,6 @@ pub fn parseI64(s: []const u8, radix: u8) ParseError!i64 {
     return std.fmt.parseInt(i64, trimmed, radix) catch |err| switch (err) {
         error.InvalidCharacter => ParseError.InvalidCharacter,
         error.Overflow => ParseError.Overflow,
-        error.Empty => ParseError.Empty,
-        else => ParseError.InvalidFormat,
     };
 }
 
@@ -129,8 +123,6 @@ pub fn parseU64(s: []const u8, radix: u8) ParseError!u64 {
     return std.fmt.parseInt(u64, trimmed, radix) catch |err| switch (err) {
         error.InvalidCharacter => ParseError.InvalidCharacter,
         error.Overflow => ParseError.Overflow,
-        error.Empty => ParseError.Empty,
-        else => ParseError.InvalidFormat,
     };
 }
 

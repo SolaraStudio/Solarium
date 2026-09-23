@@ -273,7 +273,7 @@ test "saturating ops" {
 }
 
 test "bit operations" {
-    try std.testing.expectEqual(@as(u32, 0), clz(0));
+    try std.testing.expectEqual(@as(u32, 32), clz(0));
     try std.testing.expectEqual(@as(u32, 0), clz(-1));
     try std.testing.expectEqual(@as(u32, 31), clz(1));
     try std.testing.expectEqual(@as(u32, 0), ctz(1));

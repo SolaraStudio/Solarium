@@ -277,7 +277,7 @@ pub fn decompose(x: f64) struct { mantissa: f64, exponent: i32 } {
         return .{ .mantissa = x, .exponent = 0 };
     }
     const abs_x = @abs(x);
-    const exp: i32 = @intFromFloat(@floor(@log2(abs_x))) + 1;
+    const exp: i32 = @as(i32, @intFromFloat(@floor(@log2(abs_x)))) + 1;
     const mantissa = x / std.math.pow(f64, 2.0, @floatFromInt(exp));
     return .{ .mantissa = mantissa, .exponent = exp };
 }
@@ -292,7 +292,7 @@ pub fn frexp(x: f64, exp_out: *i32) f64 {
         return x;
     }
     const abs_x = @abs(x);
-    var e: i32 = @intFromFloat(@floor(@log2(abs_x))) + 1;
+    var e: i32 = @as(i32, @intFromFloat(@floor(@log2(abs_x)))) + 1;
     var m = x / std.math.pow(f64, 2.0, @floatFromInt(e));
     if (@abs(m) >= 1.0) {
         e += 1;

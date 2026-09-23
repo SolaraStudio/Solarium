@@ -13,18 +13,18 @@ pub const Tag = enum(u3) {
 };
 
 pub const NAN_BOX_MASK: u64 = 0xFFFF_0000_0000_0000;
-pub const PAYLOAD_MASK: u64 = 0x0000_FFFF_FFFF_FFFF;
-pub const TAG_SHIFT: u6 = 48;
+pub const PAYLOAD_MASK: u64 = 0x0000_1FFF_FFFF_FFFF;
+pub const TAG_SHIFT: u6 = 45;
 pub const TAG_MASK: u64 = 0x7;
 
 pub const CANONICAL_NAN: u64 = 0x7FF8_0000_0000_0000;
 pub const BOXED_NAN_PREFIX: u64 = 0x7FF9_0000_0000_0000;
 pub const BOXED_NAN_PREFIX_MASK: u64 = 0xFFFF_0000_0000_0000;
 
-pub const TRUE_BITS: u64 = 0x7FF9_0000_0000_0004;
-pub const FALSE_BITS: u64 = 0x7FF9_0000_0000_0000;
-pub const UNDEFINED_BITS: u64 = 0x7FF9_0000_0000_0002;
-pub const NULL_BITS: u64 = 0x7FF9_0000_0000_0003;
+pub const UNDEFINED_BITS: u64 = BOXED_NAN_PREFIX | 0x1;
+pub const NULL_BITS: u64 = BOXED_NAN_PREFIX | 0x2;
+pub const TRUE_BITS: u64 = BOXED_NAN_PREFIX | 0x4;
+pub const FALSE_BITS: u64 = BOXED_NAN_PREFIX | 0x8;
 
 pub const TaggedValue = union(enum) {
     double: f64,
@@ -142,8 +142,8 @@ pub fn boxSymbol(index: u48) u64 {
 }
 
 pub fn isBoxed(bits: u64) bool {
-    if (bits == TRUE_BITS or bits == FALSE_BITS) return true;
-    if (bits == UNDEFINED_BITS or bits == NULL_BITS) return true;
+
+
     return (bits & BOXED_NAN_PREFIX_MASK) == BOXED_NAN_PREFIX;
 }
 
@@ -247,6 +247,7 @@ pub fn isTruthy(bits: u64) bool {
     if (bits == UNDEFINED_BITS) return false;
     if (bits == NULL_BITS) return false;
     if (bits == TRUE_BITS) return true;
+    if (isInt32Boxed(bits)) return unboxInt32(bits) != 0;
     return true;
 }
 
@@ -348,28 +349,28 @@ test "pack and unpack round trip" {
 }
 
 test "TaggedValue predicates" {
-    try std.testing.expect(TaggedValue{ .double = 1.0 }.isDouble());
-    try std.testing.expect(TaggedValue{ .int32 = 1 }.isInt32());
-    try std.testing.expect(TaggedValue{ .boolean = true }.isBoolean());
-    try std.testing.expect(TaggedValue{ .object = 1 }.isObject());
-    try std.testing.expect(TaggedValue{ .string = 1 }.isString());
-    try std.testing.expect(TaggedValue{ .symbol = 1 }.isSymbol());
-    try std.testing.expect(TaggedValue{ .null_val = {} }.isNull());
-    try std.testing.expect(TaggedValue{ .undefined = {} }.isUndefined());
-    try std.testing.expect(TaggedValue{ .double = 1.0 }.isNumber());
-    try std.testing.expect(TaggedValue{ .int32 = 1 }.isNumber());
+    try std.testing.expect((TaggedValue{ .double = 1.0 }).isDouble());
+    try std.testing.expect((TaggedValue{ .int32 = 1 }).isInt32());
+    try std.testing.expect((TaggedValue{ .boolean = true }).isBoolean());
+    try std.testing.expect((TaggedValue{ .object = 1 }).isObject());
+    try std.testing.expect((TaggedValue{ .string = 1 }).isString());
+    try std.testing.expect((TaggedValue{ .symbol = 1 }).isSymbol());
+    try std.testing.expect((TaggedValue{ .null_val = {} }).isNull());
+    try std.testing.expect((TaggedValue{ .undefined = {} }).isUndefined());
+    try std.testing.expect((TaggedValue{ .double = 1.0 }).isNumber());
+    try std.testing.expect((TaggedValue{ .int32 = 1 }).isNumber());
 }
 
 test "asDouble and asInt32 and asBoolean" {
-    try std.testing.expectEqual(@as(?f64, 3.14), TaggedValue{ .double = 3.14 }.asDouble());
-    try std.testing.expectEqual(@as(?f64, 42.0), TaggedValue{ .int32 = 42 }.asDouble());
-    try std.testing.expect(TaggedValue{ .boolean = true }.asDouble() == null);
+    try std.testing.expectEqual(@as(?f64, 3.14), (TaggedValue{ .double = 3.14 }).asDouble());
+    try std.testing.expectEqual(@as(?f64, 42.0), (TaggedValue{ .int32 = 42 }).asDouble());
+    try std.testing.expect((TaggedValue{ .boolean = true }).asDouble() == null);
 
-    try std.testing.expectEqual(@as(?i32, 42), TaggedValue{ .int32 = 42 }.asInt32());
-    try std.testing.expect(TaggedValue{ .double = 1.0 }.asInt32() == null);
+    try std.testing.expectEqual(@as(?i32, 42), (TaggedValue{ .int32 = 42 }).asInt32());
+    try std.testing.expect((TaggedValue{ .double = 1.0 }).asInt32() == null);
 
-    try std.testing.expectEqual(@as(?bool, true), TaggedValue{ .boolean = true }.asBoolean());
-    try std.testing.expect(TaggedValue{ .int32 = 1 }.asBoolean() == null);
+    try std.testing.expectEqual(@as(?bool, true), (TaggedValue{ .boolean = true }).asBoolean());
+    try std.testing.expect((TaggedValue{ .int32 = 1 }).asBoolean() == null);
 }
 
 test "isTruthy for doubles" {
@@ -386,7 +387,7 @@ test "isTruthy for boxed values" {
     try std.testing.expect(!isTruthy(boxUndefined()));
     try std.testing.expect(!isTruthy(boxNull()));
     try std.testing.expect(isTruthy(boxInt32(1)));
-    try std.testing.expect(isTruthy(boxInt32(0)));
+    try std.testing.expect(!isTruthy(boxInt32(0)));
     try std.testing.expect(isTruthy(boxObject(0)));
     try std.testing.expect(isTruthy(boxString(0)));
 }
