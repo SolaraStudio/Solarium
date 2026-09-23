@@ -1,0 +1,14 @@
+.{
+    .name = .solarium,
+    .version = "1.17.0",
+    .minimum_zig_version = "0.14.0",
+    .fingerprint = 0x9c3b4a2e1d8f7e60,
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+    .dependencies = .{},
+}
