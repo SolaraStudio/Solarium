@@ -184,5 +184,5 @@ test "convenience constructors part two" {
 
 test "kind message is stable" {
     try std.testing.expectEqualStrings("reached unreachable state", Kind.unreachable_state.message());
-    try std.testing.expectEqualStrings("not implemented", Kind.not_implemented.message());
+    try std.testing.expectEqualStrings("feature not implemented", Kind.not_implemented.message());
 }

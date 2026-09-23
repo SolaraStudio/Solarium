@@ -9,8 +9,8 @@ pub const ReferenceError = struct {
         return .{ .message = message };
     }
 
-    pub fn forIdentifier(name: []const u8) ReferenceError {
-        return .{ .message = "identifier is not defined", .identifier = name };
+    pub fn forIdentifier(identifier_name: []const u8) ReferenceError {
+        return .{ .message = "identifier is not defined", .identifier = identifier_name };
     }
 
     pub fn name(self: ReferenceError) []const u8 {
