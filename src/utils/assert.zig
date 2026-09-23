@@ -128,7 +128,7 @@ pub fn assertFalse(condition: bool) void {
     }
 }
 
-pub fn unreachable() noreturn {
+pub fn unreachableCode() noreturn {
     @panic("unreachable code reached");
 }
 
@@ -136,13 +136,13 @@ pub fn unreachableWithMessage(comptime message: []const u8) noreturn {
     @panic(message);
 }
 
-pub fn comptimeAssert(condition: bool) void {
+pub fn comptimeAssert(comptime condition: bool) void {
     if (!condition) {
         @compileError("comptime assertion failed");
     }
 }
 
-pub fn comptimeAssertWithMessage(condition: bool, comptime message: []const u8) void {
+pub fn comptimeAssertWithMessage(comptime condition: bool, comptime message: []const u8) void {
     if (!condition) {
         @compileError(message);
     }
@@ -348,7 +348,17 @@ test "assertValidIndex on empty slice would fail" {
     _ = slice;
 }
 
-test "unreachableWithMessage is noreturn" {
+test "unreachableCode returns on true branch" {
+    const check = struct {
+        fn f(cond: bool) u32 {
+            if (cond) return 1;
+            unreachableCode();
+        }
+    };
+    try std.testing.expectEqual(@as(u32, 1), check.f(true));
+}
+
+test "unreachableWithMessage returns on true branch" {
     const check = struct {
         fn f(cond: bool) u32 {
             if (cond) return 1;

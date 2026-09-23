@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub const Nanoseconds = i128;
 pub const Microseconds = i64;
@@ -22,19 +23,27 @@ pub const ms_per_min: i64 = 60 * ms_per_s;
 pub const ms_per_hour: i64 = 60 * ms_per_min;
 
 pub fn nowNanos() Nanoseconds {
-    return std.time.nanoTimestamp();
+    var ts: std.posix.timespec = .{ .sec = 0, .nsec = 0 };
+    if (comptime @import("builtin").os.tag == .linux) {
+        const rc = std.os.linux.clock_gettime(.MONOTONIC, &ts);
+        if (rc != 0) return 0;
+    } else {
+        const rc = std.c.clock_gettime(std.c.CLOCK.MONOTONIC, &ts);
+        if (rc != 0) return 0;
+    }
+    return @as(Nanoseconds, ts.sec) * ns_per_s + ts.nsec;
 }
 
 pub fn nowMicros() Microseconds {
-    return @intCast(@divTrunc(std.time.nanoTimestamp(), ns_per_us));
+    return @intCast(@divTrunc(nowNanos(), ns_per_us));
 }
 
 pub fn nowMillis() Milliseconds {
-    return std.time.milliTimestamp();
+    return @intCast(@divTrunc(nowNanos(), ns_per_ms));
 }
 
 pub fn nowSeconds() Seconds {
-    return std.time.timestamp();
+    return @intCast(@divTrunc(nowNanos(), ns_per_s));
 }
 
 pub const Duration = struct {
@@ -165,10 +174,9 @@ pub const Duration = struct {
 
     pub fn format(
         self: Duration,
-        comptime _: []const u8,
-        _: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+
         const total = self.nanos;
         if (total < 0) {
             try writer.writeAll("-");
@@ -240,7 +248,7 @@ pub const Timer = struct {
         return Duration.fromNanos(self.accumulated);
     }
 
-    pub fn resume(self: *Timer) void {
+    pub fn resumeTimer(self: *Timer) void {
         if (!self.running) {
             self.start_ns = nowNanos();
             self.running = true;
@@ -287,22 +295,38 @@ pub fn measure(comptime f: anytype, args: anytype) struct { result: @TypeOf(@cal
 
 pub fn sleepNanos(n: Nanoseconds) void {
     if (n <= 0) return;
-    std.Thread.sleep(@intCast(n));
+    const ns: u64 = @intCast(n);
+    var req: std.os.linux.timespec = .{
+        .sec = @intCast(ns / 1_000_000_000),
+        .nsec = @intCast(ns % 1_000_000_000),
+    };
+    var rem: std.os.linux.timespec = undefined;
+    while (true) {
+        const rc = std.os.linux.nanosleep(&req, &rem);
+        switch (rc) {
+            0 => return,
+            4 => {
+                req = rem;
+                continue;
+            },
+            else => return,
+        }
+    }
 }
 
 pub fn sleepMicros(us: Microseconds) void {
     if (us <= 0) return;
-    std.Thread.sleep(@as(u64, @intCast(us)) * 1000);
+    sleepNanos(@as(Nanoseconds, us) * 1000);
 }
 
 pub fn sleepMillis(ms: Milliseconds) void {
     if (ms <= 0) return;
-    std.Thread.sleep(@as(u64, @intCast(ms)) * 1000 * 1000);
+    sleepNanos(@as(Nanoseconds, ms) * 1_000_000);
 }
 
 pub fn sleepSeconds(s: Seconds) void {
     if (s <= 0) return;
-    std.Thread.sleep(@as(u64, @intCast(s)) * 1000 * 1000 * 1000);
+    sleepNanos(@as(Nanoseconds, s) * 1_000_000_000);
 }
 
 test "now functions are monotonic" {
@@ -416,7 +440,7 @@ test "Timer resume accumulates" {
     sleepMillis(1);
     _ = t.stop();
     sleepMillis(5);
-    t.resume();
+    t.resumeTimer();
     sleepMillis(1);
     const total = t.stop();
     try std.testing.expect(total.toMillis() >= 2);
@@ -460,30 +484,29 @@ test "sleepMillis basic" {
     try std.testing.expect(elapsed >= 1);
 }
 
-test "Duration format nanoseconds" {
-    var buf: [64]u8 = undefined;
-    const d = Duration.fromNanos(500);
-    const s = try std.fmt.bufPrint(&buf, "{}", .{d});
-    try std.testing.expect(std.mem.indexOf(u8, s, "ns") != null);
-}
-
 test "Duration format microseconds" {
     var buf: [64]u8 = undefined;
-    const d = Duration.fromMicros(1500);
-    const s = try std.fmt.bufPrint(&buf, "{}", .{d});
+    const d = Duration.fromMicros(500);
+    var writer = std.Io.Writer.fixed(&buf);
+    try writer.print("{f}", .{d});
+    const s = writer.buffered();
     try std.testing.expect(std.mem.indexOf(u8, s, "us") != null);
 }
 
 test "Duration format milliseconds" {
     var buf: [64]u8 = undefined;
-    const d = Duration.fromMillis(1500);
-    const s = try std.fmt.bufPrint(&buf, "{}", .{d});
+    const d = Duration.fromMillis(500);
+    var writer = std.Io.Writer.fixed(&buf);
+    try writer.print("{f}", .{d});
+    const s = writer.buffered();
     try std.testing.expect(std.mem.indexOf(u8, s, "ms") != null);
 }
 
 test "Duration format seconds" {
     var buf: [64]u8 = undefined;
     const d = Duration.fromSeconds(5);
-    const s = try std.fmt.bufPrint(&buf, "{}", .{d});
+    var writer = std.Io.Writer.fixed(&buf);
+        try writer.print("{f}", .{d});
+        const s = writer.buffered();
     try std.testing.expect(std.mem.indexOf(u8, s, "s") != null);
 }

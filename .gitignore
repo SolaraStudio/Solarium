@@ -1,0 +1,74 @@
+# Zig
+.zig-cache/
+zig-cache/
+zig-out/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.lib
+*.obj
+
+# Build artifacts
+build/
+dist/
+out/
+target/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Coverage / profiling
+*.prof
+*.trace
+perf.data*
+*.gcda
+*.gcno
+*.gcov
+
+# Test outputs
+test-results/
+coverage/
+
+# Caches
+.cache/
+*.cache
+
+# Local only
+local.properties
+secrets.txt
+
+# Node (if extension work happens)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python (if scripts appear)
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Rust (if any)
+Cargo.lock

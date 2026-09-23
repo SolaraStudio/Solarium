@@ -1,7 +1,17 @@
 const std = @import("std");
-const config = @import("../config/config.zig");
 
-pub const Level = config.LogLevel;
+pub const Level = enum(u8) {
+    off = 0,
+    err = 1,
+    warn = 2,
+    info = 3,
+    debug = 4,
+    trace = 5,
+
+    pub fn enabled(self: Level, other: Level) bool {
+        return @intFromEnum(self) >= @intFromEnum(other);
+    }
+};
 
 pub const Sink = enum {
     stderr,
@@ -134,7 +144,11 @@ pub const Logger = struct {
     fn writeFormatted(comptime fmt: []const u8, args: anytype, sink: Sink) void {
         switch (sink) {
             .stderr => std.debug.print(fmt, args),
-            .stdout => std.debug.print(fmt, args),
+            .stdout => {
+                var buf: [4096]u8 = undefined;
+                const msg = std.fmt.bufPrint(&buf, fmt, args) catch return;
+                std.fs.File.stdout().writeAll(msg) catch {};
+            },
             .silent => {},
         }
     }

@@ -60,7 +60,7 @@ pub const Version = struct {
         return .{ .major = m, .minor = n, .patch = p };
     }
 
-    pub fn format(self: Version, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(self: Version, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.print("{d}.{d}.{d}", .{ self.major, self.minor, self.patch });
     }
 

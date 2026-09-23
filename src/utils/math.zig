@@ -57,7 +57,6 @@ pub fn remap(value: f64, in_min: f64, in_max: f64, out_min: f64, out_max: f64) f
 }
 
 pub fn wrap(value: anytype, max_value: @TypeOf(value)) @TypeOf(value) {
-    const T = @TypeOf(value);
     if (max_value <= 0) return value;
     if (value >= 0 and value < max_value) return value;
     const m = @mod(value, max_value);

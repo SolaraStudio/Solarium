@@ -226,14 +226,16 @@ pub fn create() Hasher {
 test "fnv1a32 known values" {
     try std.testing.expectEqual(@as(u32, 0x811c9dc5), fnv1a32(""));
     try std.testing.expectEqual(@as(u32, 0xe40c292c), fnv1a32("a"));
-    try std.testing.expectEqual(@as(u32, 0xe70c2de5), fnv1a32("ab"));
-    try std.testing.expectEqual(@as(u32, 0xe60c2c52), fnv1a32("abc"));
+    try std.testing.expectEqual(@as(u32, 0xe70c2de5), fnv1a32("b"));
+    try std.testing.expectEqual(@as(u32, 0xe60c2c52), fnv1a32("c"));
+    try std.testing.expectEqual(@as(u32, 0x4d2505ca), fnv1a32("ab"));
 }
 
 test "fnv1a64 known values" {
     try std.testing.expectEqual(@as(u64, 0xcbf29ce484222325), fnv1a64(""));
     try std.testing.expectEqual(@as(u64, 0xaf63dc4c8601ec8c), fnv1a64("a"));
-    try std.testing.expectEqual(@as(u64, 0xaf63df4c8601f1a5), fnv1a64("ab"));
+    try std.testing.expectEqual(@as(u64, 0xaf63df4c8601f1a5), fnv1a64("b"));
+    try std.testing.expectEqual(@as(u64, 0x089c4407b545986a), fnv1a64("ab"));
 }
 
 test "fnv1 differs from fnv1a" {

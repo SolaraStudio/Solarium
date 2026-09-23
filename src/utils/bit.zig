@@ -13,11 +13,11 @@ pub fn trailingZeros(x: anytype) u32 {
 }
 
 pub fn rotateLeft(x: anytype, comptime n: std.math.Log2Int(@TypeOf(x))) @TypeOf(x) {
-    return @rotl(x, n);
+    return std.math.rotl(@TypeOf(x), x, n);
 }
 
 pub fn rotateRight(x: anytype, comptime n: std.math.Log2Int(@TypeOf(x))) @TypeOf(x) {
-    return @rotr(x, n);
+    return std.math.rotr(@TypeOf(x), x, n);
 }
 
 pub fn testBit(x: anytype, bit: anytype) bool {
