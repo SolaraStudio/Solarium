@@ -77,7 +77,9 @@ pub const Version = struct {
     }
 
     pub fn isCompatibleWith(self: Version, other: Version) bool {
-        if (self.major == 0 or other.major == 0) return self.major == other.major;
+        if (self.major == 0 or other.major == 0) {
+            return self.eql(other);
+        }
         return self.major == other.major and other.minor >= self.minor;
     }
 };
