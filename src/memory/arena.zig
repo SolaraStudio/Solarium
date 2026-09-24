@@ -6,8 +6,8 @@ pub const Arena = struct {
     backing: std.mem.Allocator,
     owns_buffer: bool,
 
-    pub fn init(backing: std.mem.Allocator, capacity: usize) !Arena {
-        const buffer = try backing.alloc(u8, capacity);
+    pub fn init(backing: std.mem.Allocator, size: usize) !Arena {
+        const buffer = try backing.alloc(u8, size);
         return .{
             .buffer = buffer,
             .offset = 0,

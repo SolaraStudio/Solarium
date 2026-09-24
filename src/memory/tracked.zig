@@ -189,8 +189,9 @@ test "Tracked reset stats" {
 test "CountedAllocator counts" {
     var c = CountedAllocator.init(std.testing.allocator);
     const slice = try c.alloc(u8, 10);
-    defer c.free(slice);
     try std.testing.expectEqual(@as(u64, 1), c.allocation_count);
+    try std.testing.expectEqual(@as(u64, 1), c.liveCount());
+    c.free(slice);
     try std.testing.expectEqual(@as(u64, 0), c.liveCount());
 }
 

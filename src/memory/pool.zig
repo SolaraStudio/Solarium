@@ -18,15 +18,15 @@ pub fn Pool(comptime T: type) type {
             in_use: bool,
         };
 
-        pub fn init(backing: std.mem.Allocator, capacity: usize) !Self {
-            const slots = try backing.alloc(Slot, capacity);
+        pub fn init(backing: std.mem.Allocator, size: usize) !Self {
+            const slots = try backing.alloc(Slot, size);
             for (slots, 0..) |*slot, i| {
                 slot.in_use = false;
-                slot.next_free = if (i + 1 < capacity) @intCast(i + 1) else null;
+                slot.next_free = if (i + 1 < size) @intCast(i + 1) else null;
             }
             return .{
                 .slots = slots,
-                .free_head = if (capacity > 0) 0 else null,
+                .free_head = if (size > 0) 0 else null,
                 .backing = backing,
                 .live_count = 0,
                 .peak_count = 0,
@@ -133,8 +133,8 @@ pub fn Stack(comptime T: type) type {
 
         pool: Pool(T),
 
-        pub fn init(backing: std.mem.Allocator, capacity: usize) !Self {
-            return .{ .pool = try Pool(T).init(backing, capacity) };
+        pub fn init(backing: std.mem.Allocator, size: usize) !Self {
+            return .{ .pool = try Pool(T).init(backing, size) };
         }
 
         pub fn deinit(self: *Self) void {
