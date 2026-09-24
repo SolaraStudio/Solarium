@@ -239,7 +239,7 @@ pub const Scanner = struct {
 };
 
 test "Scanner init" {
-    var s = Scanner.init("hello");
+    const s = Scanner.init("hello");
     try std.testing.expectEqual(@as(u32, 0), s.index);
     try std.testing.expectEqual(@as(usize, 5), s.source.len);
 }

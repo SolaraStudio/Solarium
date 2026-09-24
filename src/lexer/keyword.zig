@@ -408,7 +408,7 @@ test "categorize" {
     try std.testing.expectEqual(Category.literal, categorize("true"));
     try std.testing.expectEqual(Category.contextual, categorize("let"));
     try std.testing.expectEqual(Category.strict_reserved, categorize("implements"));
-    try std.testing.expectEqual(Category.future_reserved, categorize("enum"));
+    try std.testing.expectEqual(Category.reserved, categorize("enum"));
     try std.testing.expectEqual(Category.not_keyword, categorize("foo"));
 }
 

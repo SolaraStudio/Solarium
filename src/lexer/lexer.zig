@@ -149,10 +149,10 @@ pub const Lexer = struct {
                     self.scanner.advanceNewline();
                 },
                 '/' => {
-                    const next = self.scanner.peekAt(1);
-                    if (next == '/') {
-                        self.scanner.skipInlineComment();
-                    } else if (next == '*') {
+                    const next_ch = self.scanner.peekAt(1);
+                    if (next_ch == '/') {
+                        _ = self.scanner.skipInlineComment();
+                    } else if (next_ch == '*') {
                         const before_line = self.scanner.pos.line;
                         _ = self.scanner.skipBlockComment();
                         if (self.scanner.pos.line > before_line) {
@@ -447,6 +447,7 @@ pub const Lexer = struct {
     }
 
     fn scanString(self: *Lexer, start_index: u32, start_pos: Position, quote: u8) LexError!Token {
+        _ = start_pos;
         _ = self.scanner.advance();
         var has_escape = false;
 
@@ -634,7 +635,7 @@ pub const Lexer = struct {
                     return self.makeToken(.op_nullish, start_index, start_pos, self.newline_before);
                 }
                 if (n1 == '.') {
-                    const n2 = self.scanner.peekAt(2);
+                    const n2 = self.scanner.peekAt(2) orelse 0;
                     if (n2 >= '0' and n2 <= '9') {
                         _ = self.scanner.advance();
                         return self.makeToken(.punct_question, start_index, start_pos, self.newline_before);
@@ -754,7 +755,7 @@ pub const Lexer = struct {
             '>' => {
                 const n1 = self.scanner.peekAt(1);
                 if (n1 == '>') {
-                    const n2 = self.scanner.peekAt(2);
+                    const n2 = self.scanner.peekAt(2) orelse 0;
                     if (n2 == '>') {
                         if (self.scanner.peekAt(3) == '=') {
                             self.scanner.advanceAscii(4);

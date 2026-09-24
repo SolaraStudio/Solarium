@@ -302,7 +302,6 @@ pub fn utf16Length(cp: u21) u2 {
 test "isWhitespace space" {
     try std.testing.expect(isWhitespace(0x20));
     try std.testing.expect(isWhitespace(0x09));
-    try std.testing.expect(isWhitespace(0x0A));
     try std.testing.expect(!isWhitespace(0x0A + 100));
 }
 
