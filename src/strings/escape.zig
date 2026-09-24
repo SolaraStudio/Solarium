@@ -8,63 +8,63 @@ pub const EscapeError = error{
     BufferTooSmall,
 };
 
-pub fn escapeSingle(c: u8, out: *std.ArrayList(u8)) !void {
+pub fn escapeSingle(allocator: std.mem.Allocator, c: u8, out: *std.ArrayList(u8)) !void {
     switch (c) {
-        '"' => try out.appendSlice("\\\""),
-        '\\' => try out.appendSlice("\\\\"),
-        '\n' => try out.appendSlice("\\n"),
-        '\r' => try out.appendSlice("\\r"),
-        '\t' => try out.appendSlice("\\t"),
-        0x08 => try out.appendSlice("\\b"),
-        0x0C => try out.appendSlice("\\f"),
-        0x0B => try out.appendSlice("\\v"),
-        0x00 => try out.appendSlice("\\0"),
-        0x1B => try out.appendSlice("\\e"),
+        '"' => try out.appendSlice(allocator, "\\\""),
+        '\\' => try out.appendSlice(allocator, "\\\\"),
+        '\n' => try out.appendSlice(allocator, "\\n"),
+        '\r' => try out.appendSlice(allocator, "\\r"),
+        '\t' => try out.appendSlice(allocator, "\\t"),
+        0x08 => try out.appendSlice(allocator, "\\b"),
+        0x0C => try out.appendSlice(allocator, "\\f"),
+        0x0B => try out.appendSlice(allocator, "\\v"),
+        0x00 => try out.appendSlice(allocator, "\\0"),
+        0x1B => try out.appendSlice(allocator, "\\e"),
         else => {
             if (c < 0x20 or c == 0x7F) {
                 var buf: [8]u8 = undefined;
                 const s = try std.fmt.bufPrint(&buf, "\\x{x:0>2}", .{c});
-                try out.appendSlice(s);
+                try out.appendSlice(allocator, s);
             } else {
-                try out.append(c);
+                try out.append(allocator, c);
             }
         },
     }
 }
 
 pub fn escape(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
-    var out = std.ArrayList(u8).init(allocator);
-    errdefer out.deinit();
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
 
-    try out.append('"');
+    try out.append(allocator, '"');
     for (input) |c| {
-        try escapeSingle(c, &out);
+        try escapeSingle(allocator, c, &out);
     }
-    try out.append('"');
+    try out.append(allocator, '"');
 
-    return out.toOwnedSlice();
+    return out.toOwnedSlice(allocator);
 }
 
 pub fn escapeNoQuotes(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
-    var out = std.ArrayList(u8).init(allocator);
-    errdefer out.deinit();
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
 
     for (input) |c| {
-        try escapeSingle(c, &out);
+        try escapeSingle(allocator, c, &out);
     }
 
-    return out.toOwnedSlice();
+    return out.toOwnedSlice(allocator);
 }
 
 pub fn unescape(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
-    var out = std.ArrayList(u8).init(allocator);
-    errdefer out.deinit();
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
 
     var i: usize = 0;
     while (i < input.len) {
         const c = input[i];
         if (c != '\\') {
-            try out.append(c);
+            try out.append(allocator, c);
             i += 1;
             continue;
         }
@@ -74,23 +74,23 @@ pub fn unescape(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
         i += 2;
 
         switch (next) {
-            '"' => try out.append('"'),
-            '\'' => try out.append('\''),
-            '\\' => try out.append('\\'),
-            '/' => try out.append('/'),
-            'n' => try out.append('\n'),
-            'r' => try out.append('\r'),
-            't' => try out.append('\t'),
-            'b' => try out.append(0x08),
-            'f' => try out.append(0x0C),
-            'v' => try out.append(0x0B),
-            '0' => try out.append(0x00),
-            'e' => try out.append(0x1B),
+            '"' => try out.append(allocator, '"'),
+            '\'' => try out.append(allocator, '\''),
+            '\\' => try out.append(allocator, '\\'),
+            '/' => try out.append(allocator, '/'),
+            'n' => try out.append(allocator, '\n'),
+            'r' => try out.append(allocator, '\r'),
+            't' => try out.append(allocator, '\t'),
+            'b' => try out.append(allocator, 0x08),
+            'f' => try out.append(allocator, 0x0C),
+            'v' => try out.append(allocator, 0x0B),
+            '0' => try out.append(allocator, 0x00),
+            'e' => try out.append(allocator, 0x1B),
             'x' => {
                 if (i + 1 >= input.len) return EscapeError.InvalidEscape;
                 const hex = input[i .. i + 2];
                 const value = std.fmt.parseInt(u8, hex, 16) catch return EscapeError.InvalidHexDigit;
-                try out.append(value);
+                try out.append(allocator, value);
                 i += 2;
             },
             'u' => {
@@ -100,12 +100,12 @@ pub fn unescape(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
                     const hex = input[i + 1 .. i + end];
                     const cp = std.fmt.parseInt(u21, hex, 16) catch return EscapeError.InvalidHexDigit;
                     if (cp > 0x10FFFF) return EscapeError.InvalidCodePoint;
-                    try appendUtf8(&out, cp);
+                    try appendUtf8(allocator, &out, cp);
                     i += end + 1;
                 } else {
                     const hex = input[i .. i + 4];
                     const cp = std.fmt.parseInt(u21, hex, 16) catch return EscapeError.InvalidHexDigit;
-                    try appendUtf8(&out, cp);
+                    try appendUtf8(allocator, &out, cp);
                     i += 4;
                 }
             },
@@ -113,48 +113,48 @@ pub fn unescape(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
         }
     }
 
-    return out.toOwnedSlice();
+    return out.toOwnedSlice(allocator);
 }
 
-fn appendUtf8(out: *std.ArrayList(u8), cp: u21) !void {
+fn appendUtf8(allocator: std.mem.Allocator, out: *std.ArrayList(u8), cp: u21) !void {
     const utf8 = @import("utf8.zig");
     var buf: [4]u8 = undefined;
     const n = utf8.encode(cp, &buf) orelse return EscapeError.InvalidCodePoint;
-    try out.appendSlice(buf[0..n]);
+    try out.appendSlice(allocator, buf[0..n]);
 }
 
 pub fn escapeHtml(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
-    var out = std.ArrayList(u8).init(allocator);
-    errdefer out.deinit();
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
 
     for (input) |c| {
         switch (c) {
-            '<' => try out.appendSlice("&lt;"),
-            '>' => try out.appendSlice("&gt;"),
-            '&' => try out.appendSlice("&amp;"),
-            '"' => try out.appendSlice("&quot;"),
-            '\'' => try out.appendSlice("&#39;"),
-            else => try out.append(c),
+            '<' => try out.appendSlice(allocator, "&lt;"),
+            '>' => try out.appendSlice(allocator, "&gt;"),
+            '&' => try out.appendSlice(allocator, "&amp;"),
+            '"' => try out.appendSlice(allocator, "&quot;"),
+            '\'' => try out.appendSlice(allocator, "&#39;"),
+            else => try out.append(allocator, c),
         }
     }
 
-    return out.toOwnedSlice();
+    return out.toOwnedSlice(allocator);
 }
 
 pub fn unescapeHtml(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
-    var out = std.ArrayList(u8).init(allocator);
-    errdefer out.deinit();
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(allocator);
 
     var i: usize = 0;
     while (i < input.len) {
         if (input[i] != '&') {
-            try out.append(input[i]);
+            try out.append(allocator, input[i]);
             i += 1;
             continue;
         }
 
         const end = std.mem.indexOfScalar(u8, input[i..], ';') orelse {
-            try out.append(input[i]);
+            try out.append(allocator, input[i]);
             i += 1;
             continue;
         };
@@ -163,34 +163,34 @@ pub fn unescapeHtml(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
         i += end + 1;
 
         if (std.mem.eql(u8, entity, "lt")) {
-            try out.append('<');
+            try out.append(allocator, '<');
         } else if (std.mem.eql(u8, entity, "gt")) {
-            try out.append('>');
+            try out.append(allocator, '>');
         } else if (std.mem.eql(u8, entity, "amp")) {
-            try out.append('&');
+            try out.append(allocator, '&');
         } else if (std.mem.eql(u8, entity, "quot")) {
-            try out.append('"');
+            try out.append(allocator, '"');
         } else if (std.mem.eql(u8, entity, "apos")) {
-            try out.append('\'');
+            try out.append(allocator, '\'');
         } else if (std.mem.eql(u8, entity, "nbsp")) {
-            try out.append(0xA0);
+            try out.append(allocator, 0xA0);
         } else if (entity.len > 0 and entity[0] == '#') {
             const hex = entity[1..];
             if (hex.len > 0 and (hex[0] == 'x' or hex[0] == 'X')) {
                 const cp = std.fmt.parseInt(u21, hex[1..], 16) catch return EscapeError.InvalidHexDigit;
-                try appendUtf8(&out, cp);
+                try appendUtf8(allocator, &out, cp);
             } else {
                 const cp = std.fmt.parseInt(u21, hex, 10) catch return EscapeError.InvalidCodePoint;
-                try appendUtf8(&out, cp);
+                try appendUtf8(allocator, &out, cp);
             }
         } else {
-            try out.append('&');
-            try out.appendSlice(entity);
-            try out.append(';');
+            try out.append(allocator, '&');
+            try out.appendSlice(allocator, entity);
+            try out.append(allocator, ';');
         }
     }
 
-    return out.toOwnedSlice();
+    return out.toOwnedSlice(allocator);
 }
 
 pub fn isEscaped(input: []const u8, index: usize) bool {

@@ -23,7 +23,7 @@ pub const Interner = struct {
     pub fn init(allocator: std.mem.Allocator) Interner {
         return .{
             .allocator = allocator,
-            .entries = std.ArrayList(Entry).init(allocator),
+            .entries = .empty,
             .lookup = std.StringHashMap(u32).init(allocator),
             .generation = 1,
         };
@@ -33,7 +33,7 @@ pub const Interner = struct {
         for (self.entries.items) |entry| {
             self.allocator.free(entry.text);
         }
-        self.entries.deinit();
+        self.entries.deinit(self.allocator);
         self.lookup.deinit();
     }
 
@@ -48,7 +48,7 @@ pub const Interner = struct {
         const index: u32 = @intCast(self.entries.items.len);
         const id = StringId{ .index = index, .generation = self.generation };
 
-        try self.entries.append(.{ .text = owned, .id = id });
+        try self.entries.append(self.allocator, .{ .text = owned, .id = id });
         try self.lookup.put(owned, index);
 
         return id;

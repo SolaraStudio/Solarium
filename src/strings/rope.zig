@@ -101,23 +101,31 @@ pub const Rope = struct {
         self.total_len += text.len;
     }
 
-    pub fn concat(self: *Rope, other: *const Rope) !void {
+    pub fn concat(self: *Rope, other: *Rope) !void {
         if (other.total_len == 0) return;
         if (self.total_len == 0) {
             self.root = other.root;
             self.total_len = other.total_len;
+            other.root = null;
+            other.total_len = 0;
             return;
-        }
-        if (self.root == null or other.root == null) return;
+       }
+       if (self.root == null or other.root == null) return;
 
-        const branch = try self.allocator.create(Node);
-        branch.* = .{ .branch = .{
-            .left = self.root.?,
-            .right = other.root.?,
-            .len = self.total_len + other.total_len,
-        } };
-        self.root = branch;
-        self.total_len += other.total_len;
+       const other_root = other.root.?;
+       const other_len = other.total_len;
+
+       const branch = try self.allocator.create(Node);
+       branch.* = .{ .branch = .{
+           .left = self.root.?,
+           .right = other_root,
+           .len = self.total_len + other_len,
+       } };
+       self.root = branch;
+       self.total_len += other_len;
+
+       other.root = null;
+       other.total_len = 0;
     }
 
     pub fn toString(self: Rope) ![]u8 {
@@ -129,8 +137,7 @@ pub const Rope = struct {
         return buf;
     }
 
-    fn writeTo(self: *Rope, node: *Node, buf: []u8, pos: *usize) void {
-        _ = self;
+    fn writeTo(self: *const Rope, node: *Node, buf: []u8, pos: *usize) void {
         switch (node.*) {
             .leaf => |l| {
                 @memcpy(buf[pos.* .. pos.* + l.text.len], l.text);
@@ -149,8 +156,7 @@ pub const Rope = struct {
         return self.charAtNode(self.root.?, index);
     }
 
-    fn charAtNode(self: *Rope, node: *Node, index: usize) ?u8 {
-        _ = self;
+    fn charAtNode(self: *const Rope, node: *Node, index: usize) ?u8 {
         switch (node.*) {
             .leaf => |l| {
                 if (index >= l.text.len) return null;
@@ -176,8 +182,7 @@ pub const Rope = struct {
         return 0;
     }
 
-    fn countNodes(self: *Rope, node: *Node) usize {
-        _ = self;
+    fn countNodes(self: *const Rope, node: *Node) usize {
         return switch (node.*) {
             .leaf => 1,
             .branch => |b| 1 + self.countNodes(b.left) + self.countNodes(b.right),
@@ -189,8 +194,7 @@ pub const Rope = struct {
         return 0;
     }
 
-    fn countLeaves(self: *Rope, node: *Node) usize {
-        _ = self;
+    fn countLeaves(self: *const Rope, node: *Node) usize {
         return switch (node.*) {
             .leaf => 1,
             .branch => |b| self.countLeaves(b.left) + self.countLeaves(b.right),

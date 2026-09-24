@@ -70,17 +70,17 @@ pub const DecodeResult = struct {
 
 pub fn decode(s: []const u16) ?DecodeResult {
     if (s.len == 0) return null;
-    const u0 = s[0];
+    const unit0 = s[0];
 
-    if (!isSurrogate(u0)) {
-        return .{ .codepoint = u0, .length = 1 };
+    if (!isSurrogate(unit0)) {
+        return .{ .codepoint = unit0, .length = 1 };
     }
 
-    if (isHighSurrogate(u0)) {
+    if (isHighSurrogate(unit0)) {
         if (s.len < 2) return null;
-        const u1 = s[1];
-        if (!isLowSurrogate(u1)) return null;
-        const cp = combineSurrogates(u0, u1) orelse return null;
+        const unit1 = s[1];
+        if (!isLowSurrogate(unit1)) return null;
+        const cp = combineSurrogates(unit0, unit1) orelse return null;
         return .{ .codepoint = cp, .length = 2 };
     }
 
@@ -108,31 +108,31 @@ pub fn codepointCount(s: []const u16) ?usize {
 }
 
 pub fn utf8ToUtf16(allocator: std.mem.Allocator, input: []const u8) ![]u16 {
-    var list = std.ArrayList(u16).init(allocator);
-    errdefer list.deinit();
+    var list: std.ArrayList(u16) = .empty;
+    errdefer list.deinit(allocator);
 
     var it = utf8.Iterator.init(input);
     while (it.next()) |r| {
         var buf: [2]u16 = undefined;
         const n = encode(r.codepoint, &buf) orelse return error.InvalidCodepoint;
-        try list.appendSlice(buf[0..n]);
+        try list.appendSlice(allocator, buf[0..n]);
     }
-    return list.toOwnedSlice();
+    return list.toOwnedSlice(allocator);
 }
 
 pub fn utf16ToUtf8(allocator: std.mem.Allocator, input: []const u16) ![]u8 {
-    var list = std.ArrayList(u8).init(allocator);
-    errdefer list.deinit();
+    var list: std.ArrayList(u8) = .empty;
+    errdefer list.deinit(allocator);
 
     var i: usize = 0;
     while (i < input.len) {
         const r = decode(input[i..]) orelse return error.InvalidUtf16;
         var buf: [4]u8 = undefined;
         const n = utf8.encode(r.codepoint, &buf) orelse return error.InvalidCodepoint;
-        try list.appendSlice(buf[0..n]);
+        try list.appendSlice(allocator, buf[0..n]);
         i += r.length;
     }
-    return list.toOwnedSlice();
+    return list.toOwnedSlice(allocator);
 }
 
 pub const Iterator = struct {
