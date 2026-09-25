@@ -1,3 +1,3 @@
 test {
-    _ = @import("parser/parser.zig");
+    _ = @import("compiler/compiler.zig");
 }

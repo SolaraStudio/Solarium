@@ -76,4 +76,10 @@ test {
     _ = @import("parser/declaration.zig");
     _ = @import("parser/recovery.zig");
     _ = @import("parser/parser.zig");
+    _ = @import("compiler/opcode.zig");
+    _ = @import("compiler/bytecode.zig");
+    _ = @import("compiler/scope.zig");
+    _ = @import("compiler/emitter.zig");
+    _ = @import("compiler/optimizer.zig");
+    _ = @import("compiler/compiler.zig");
 }
