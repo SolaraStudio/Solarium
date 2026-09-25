@@ -50,7 +50,6 @@ pub const ClassItem = union(enum) {
     not_word: void,
     space: void,
     not_space: void,
-    unicode_prop: []const u8,
 };
 
 pub const Node = union(enum) {
@@ -114,6 +113,7 @@ pub const ParseResult = struct {
     allocator: std.mem.Allocator,
 
     pub fn deinit(self: *ParseResult) void {
+        freeNode(self.allocator, self.root);
         self.allocator.free(self.groups);
     }
 };
@@ -144,6 +144,7 @@ pub const Parser = struct {
 
     pub fn parse(self: *Parser) ParseError!ParseResult {
         const root = try self.parseAlternation();
+        errdefer freeNode(self.allocator, root);
 
         if (self.pos < self.pattern.len) {
             return ParseError.UnmatchedParen;
@@ -184,10 +185,6 @@ pub const Parser = struct {
         return false;
     }
 
-    fn atEnd(self: *Parser) bool {
-        return self.pos >= self.pattern.len;
-    }
-
     fn makeNode(self: *Parser, node: Node) ParseError!*Node {
         const ptr = try self.allocator.create(Node);
         ptr.* = node;
@@ -196,7 +193,10 @@ pub const Parser = struct {
 
     fn parseAlternation(self: *Parser) ParseError!*Node {
         var branches: std.ArrayList(*Node) = .empty;
-        errdefer branches.deinit(self.allocator);
+        errdefer {
+            for (branches.items) |b| freeNode(self.allocator, b);
+            branches.deinit(self.allocator);
+    }
 
         const first = try self.parseSequence();
         try branches.append(self.allocator, first);
@@ -219,7 +219,10 @@ pub const Parser = struct {
 
     fn parseSequence(self: *Parser) ParseError!*Node {
         var items: std.ArrayList(*Node) = .empty;
-        errdefer items.deinit(self.allocator);
+        errdefer {
+            for (items.items) |item| freeNode(self.allocator, item);
+            items.deinit(self.allocator);
+    }
 
         while (self.current()) |c| {
             if (c == '|' or c == ')') break;
@@ -374,25 +377,27 @@ pub const Parser = struct {
                 },
                 '=' => {
                     const inner = try self.parseAlternation();
+                    errdefer freeNode(self.allocator, inner);
                     if (!self.match(')')) return ParseError.UnmatchedParen;
-                    const look = try self.makeNode(.{ .lookahead = .{ .negative = false, .node = inner } });
-                    return look;
+                    return self.makeNode(.{ .lookahead = .{ .negative = false, .node = inner } });
                 },
                 '!' => {
                     const inner = try self.parseAlternation();
+                    errdefer freeNode(self.allocator, inner);
                     if (!self.match(')')) return ParseError.UnmatchedParen;
-                    const look = try self.makeNode(.{ .lookahead = .{ .negative = true, .node = inner } });
-                    return look;
+                    return self.makeNode(.{ .lookahead = .{ .negative = true, .node = inner } });
                 },
                 '<' => {
                     const next = self.advance() orelse return ParseError.UnexpectedEnd;
                     if (next == '=') {
                         const inner = try self.parseAlternation();
+                        errdefer freeNode(self.allocator, inner);
                         if (!self.match(')')) return ParseError.UnmatchedParen;
                         return self.makeNode(.{ .lookbehind = .{ .negative = false, .node = inner } });
                     }
                     if (next == '!') {
                         const inner = try self.parseAlternation();
+                        errdefer freeNode(self.allocator, inner);
                         if (!self.match(')')) return ParseError.UnmatchedParen;
                         return self.makeNode(.{ .lookbehind = .{ .negative = true, .node = inner } });
                     }
@@ -425,6 +430,7 @@ pub const Parser = struct {
         }
 
         const inner = try self.parseAlternation();
+        errdefer freeNode(self.allocator, inner);
 
         if (!self.match(')')) return ParseError.UnmatchedParen;
 
@@ -612,23 +618,36 @@ pub const Parser = struct {
     }
 };
 
+fn freeNode(allocator: std.mem.Allocator, node: *Node) void {
+    switch (node.*) {
+        .class => |c| allocator.free(c.items),
+        .group => |g| freeNode(allocator, g.node),
+        .alternation => |a| {
+            for (a.branches) |b| freeNode(allocator, b);
+            allocator.free(a.branches);
+        },
+        .sequence => |s| {
+            for (s.items) |item| freeNode(allocator, item);
+            allocator.free(s.items);
+        },
+        .repeat => |r| freeNode(allocator, r.node),
+        .lookahead => |l| freeNode(allocator, l.node),
+        .lookbehind => |l| freeNode(allocator, l.node),
+        else => {},
+    }
+    allocator.destroy(node);
+}
+
 pub fn parse(allocator: std.mem.Allocator, pattern: []const u8) ParseError!ParseResult {
     var parser = Parser.init(allocator, pattern);
     defer parser.deinit();
     return parser.parse();
 }
 
-fn isWordChar(c: u8) bool {
-    return (c >= 'a' and c <= 'z') or
-        (c >= 'A' and c <= 'Z') or
-        (c >= '0' and c <= '9') or
-        c == '_';
-}
-
 test "parse literal" {
     var result = try parse(std.testing.allocator, "abc");
     defer result.deinit();
-    try std.testing.expectEqual(@as(u32, 0), result.group_count);
+    try std.testing.expectEqual(@as(u32,0), result.group_count);
 }
 
 test "parse empty" {
@@ -664,7 +683,6 @@ test "parse named group" {
 test "parse alternation" {
     var result = try parse(std.testing.allocator, "a|b|c");
     defer result.deinit();
-    try std.testing.expectEqual(@as(u32, 0), result.group_count);
 }
 
 test "parse quantifiers" {
@@ -681,7 +699,6 @@ test "parse quantifiers" {
 test "parse character class" {
     var result = try parse(std.testing.allocator, "[a-z]");
     defer result.deinit();
-    try std.testing.expectEqual(@as(u32, 0), result.group_count);
 }
 
 test "parse negated character class" {

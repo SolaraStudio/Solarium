@@ -75,29 +75,6 @@ pub const Match = struct {
     }
 };
 
-pub const MatchIterator = struct {
-    source: []const u8,
-    positions: []const usize,
-    groups: []Group,
-    current: usize,
-    allocator: std.mem.Allocator,
-
-    pub fn init(allocator: std.mem.Allocator, source: []const u8, max_matches: usize) !MatchIterator {
-        return .{
-            .source = source,
-            .positions = try allocator.alloc(usize, max_matches * 2),
-            .groups = try allocator.alloc(Group, max_matches),
-            .current = 0,
-            .allocator = allocator,
-        };
-    }
-
-    pub fn deinit(self: *MatchIterator) void {
-        self.allocator.free(self.positions);
-        self.allocator.free(self.groups);
-    }
-};
-
 pub const Captures = struct {
     text: []const u8,
     start: usize,
@@ -196,12 +173,4 @@ test "makeMatch" {
     try std.testing.expectEqual(@as(usize, 3), m.start);
     try std.testing.expectEqual(@as(usize, 8), m.end);
     try std.testing.expectEqual(@as(usize, 2), m.groupCount());
-}
-
-test "MatchIterator init" {
-    var it = try MatchIterator.init(std.testing.allocator, "test", 5);
-    defer it.deinit();
-    try std.testing.expectEqual(@as(usize, 0), it.current);
-    try std.testing.expectEqual(@as(usize, 10), it.positions.len);
-    try std.testing.expectEqual(@as(usize, 5), it.groups.len);
 }

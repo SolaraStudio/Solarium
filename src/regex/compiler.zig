@@ -30,8 +30,8 @@ pub const Op = enum(u8) {
 
 pub const Inst = struct {
     op: Op,
-    x: u32 = 0,
-    y: u32 = 0,
+    x: usize = 0,
+    y: usize = 0,
 };
 
 pub const Program = struct {
@@ -104,19 +104,13 @@ pub const Compiler = struct {
         try self.insts.append(self.allocator, inst);
     }
 
-    fn emitJump(self: *Compiler, op: Op, x: u32, y: u32) CompileError!usize {
-        const index = self.insts.items.len;
-        try self.emit(.{ .op = op, .x = x, .y = y });
-        return index;
-    }
-
-    fn patch(self: *Compiler, index: usize, x: u32, y: u32) void {
+    fn patch(self: *Compiler, index: usize, x: usize, y: usize) void {
         self.insts.items[index].x = x;
         self.insts.items[index].y = y;
     }
 
-    fn currentIndex(self: *Compiler) u32 {
-        return @intCast(self.insts.items.len);
+    fn currentIndex(self: *Compiler) usize {
+        return self.insts.items.len;
     }
 
     fn compileNode(self: *Compiler, node: *parser.Node) CompileError!void {
@@ -147,8 +141,8 @@ pub const Compiler = struct {
                 }
                 try self.emit(.{ .op = .backreference, .x = idx });
             },
-            .lookahead => try self.compileLookahead(node.lookahead),
-            .lookbehind => try self.compileLookbehind(node.lookbehind),
+            .lookahead => |l| try self.compileLookahead(l),
+            .lookbehind => |l| try self.compileLookbehind(l),
         }
     }
 
@@ -158,17 +152,12 @@ pub const Compiler = struct {
         var jump_positions: std.ArrayList(usize) = .empty;
         defer jump_positions.deinit(self.allocator);
 
-        var split_positions: std.ArrayList(usize) = .empty;
-        defer split_positions.deinit(self.allocator);
-
         var i: usize = 0;
         while (i < branches.len - 1) : (i += 1) {
             const split_idx = self.insts.items.len;
             try self.emit(.{ .op = .split, .x = 0, .y = 0 });
-            try split_positions.append(self.allocator, split_idx);
 
             const branch_start = self.currentIndex();
-            self.patch(split_idx, branch_start, 0);
 
             try self.compileNode(branches[i]);
 
@@ -329,11 +318,12 @@ pub const Compiler = struct {
     }
 
     fn compileLookbehind(self: *Compiler, look: parser.Lookaround) CompileError!void {
+        _ = self;
         _ = look;
     }
 
-    fn addClass(self: *Compiler, c: parser.Class) CompileError!u32 {
-        const index: u32 = @intCast(self.classes.items.len);
+    fn addClass(self: *Compiler, c: parser.Class) CompileError!usize {
+        const index: usize = self.classes.items.len;
 
         var items: std.ArrayList(ClassItem) = .empty;
         errdefer items.deinit(self.allocator);
@@ -351,7 +341,6 @@ pub const Compiler = struct {
                 .not_word => try items.append(self.allocator, .{ .not_word = {} }),
                 .space => try items.append(self.allocator, .{ .space = {} }),
                 .not_space => try items.append(self.allocator, .{ .not_space = {} }),
-                .unicode_prop => {},
             }
         }
 

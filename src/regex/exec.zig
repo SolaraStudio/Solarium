@@ -40,7 +40,6 @@ pub const Executor = struct {
     input: []const u8,
     options: Options,
     allocator: std.mem.Allocator,
-    positions: std.ArrayList(usize),
     steps: u64,
     max_steps: u64,
 
@@ -55,48 +54,55 @@ pub const Executor = struct {
             .input = input,
             .options = options,
             .allocator = allocator,
-            .positions = .empty,
             .steps = 0,
             .max_steps = 1_000_000,
         };
     }
 
-    pub fn deinit(self: *Executor) void {
-        self.positions.deinit(self.allocator);
-    }
-
     pub fn exec(self: *Executor, start: usize) ExecError!?ExecResult {
         const group_count = self.program.group_count;
-        const total_groups = 1 + group_count;
+        const slot_count = 2 + group_count * 2;
 
-        const groups = try self.allocator.alloc(ExecResult.Group, total_groups);
-        errdefer self.allocator.free(groups);
+        const raw = try self.allocator.alloc(ExecResult.Group, slot_count);
+        defer self.allocator.free(raw);
 
-        for (groups) |*g| {
+        for (raw) |*g| {
             g.* = .{ .start = null, .end = null };
         }
 
         self.steps = 0;
 
-        if (self.runProgram(start, groups, 0)) {
-            const full_start = groups[0].start orelse start;
-            const full_end = groups[0].end orelse start;
-            return .{
-                .start = full_start,
-                .end = full_end,
-                .groups = groups,
+        if (!self.runProgram(start, raw, 0)) {
+            return null;
+        }
+
+        const out = try self.allocator.alloc(ExecResult.Group, 1 + group_count);
+        errdefer self.allocator.free(out);
+
+        out[0] = .{ .start = raw[0].start, .end = raw[1].end };
+        var i: usize = 0;
+        while (i < group_count) : (i += 1) {
+            out[i + 1] = .{
+                .start = raw[2 + i * 2].start,
+                .end = raw[3 + i * 2].end,
             };
         }
 
-        self.allocator.free(groups);
-        return null;
+        const full_start = raw[0].start orelse start;
+        const full_end = raw[1].end orelse start;
+
+        return .{
+            .start = full_start,
+            .end = full_end,
+            .groups = out,
+        };
     }
 
     fn runProgram(
         self: *Executor,
         pos: usize,
         groups: []ExecResult.Group,
-        pc: u32,
+        pc: usize,
     ) bool {
         self.steps += 1;
         if (self.steps > self.max_steps) return false;
@@ -106,13 +112,13 @@ pub const Executor = struct {
         switch (inst.op) {
             .char => {
                 if (pos >= self.input.len) return false;
-                const expected: u21 = inst.x;
-                if (expected > 0x7F) return false;
+                if (inst.x > 0x7F) return false;
+                const expected: u8 = @intCast(inst.x);
                 const actual = self.input[pos];
                 if (self.options.ignore_case) {
-                    if (lowerAscii(actual) != lowerAscii(@intCast(expected))) return false;
+                    if (lowerAscii(actual) != lowerAscii(expected)) return false;
                 } else {
-                    if (actual != @as(u8, @intCast(expected))) return false;
+                    if (actual != expected) return false;
                 }
                 return self.runProgram(pos + 1, groups, pc + 1);
             },
@@ -130,7 +136,7 @@ pub const Executor = struct {
                 if (pos >= self.input.len) return false;
                 const c = self.input[pos];
                 const class = self.program.classes[inst.x];
-                if (!self.matchClass(class, c)) return false;
+                if (!matchClass(class, c)) return false;
                 return self.runProgram(pos + 1, groups, pc + 1);
             },
             .start_anchor => {
@@ -218,82 +224,82 @@ pub const Executor = struct {
         }
     }
 
-    fn matchClass(self: *Executor, class: compiler.Class, c: u8) bool {
-        var matched = false;
-
-        var i: usize = 0;
-        while (i < class.items.len) : (i += 1) {
-            const item = class.items[i];
-            switch (item) {
-                .char => |cp| {
-                    if (cp <= 0x7F and @as(u8, @intCast(cp)) == c) {
-                        matched = true;
-                        break;
-                    }
-                },
-                .range_start => |start| {
-                    if (i + 1 < class.items.len) {
-                        const end_item = class.items[i + 1];
-                        if (end_item == .range_end) {
-                            const end = end_item.range_end;
-                            if (c >= start and c <= end) {
-                                matched = true;
-                                break;
-                            }
-                            i += 1;
-                        }
-                    }
-                },
-                .digit => {
-                    if (c >= '0' and c <= '9') {
-                        matched = true;
-                        break;
-                    }
-                },
-                .not_digit => {
-                    if (!(c >= '0' and c <= '9')) {
-                        matched = true;
-                        break;
-                    }
-                },
-                .word => {
-                    if (isWordChar(c)) {
-                        matched = true;
-                        break;
-                    }
-                },
-                .not_word => {
-                    if (!isWordChar(c)) {
-                        matched = true;
-                        break;
-                    }
-                },
-                .space => {
-                    if (isSpaceChar(c)) {
-                        matched = true;
-                        break;
-                    }
-                },
-                .not_space => {
-                    if (!isSpaceChar(c)) {
-                        matched = true;
-                        break;
-                    }
-                },
-                .range_end => {},
-            }
-        }
-
-        if (class.negated) return !matched;
-        return matched;
-    }
-
     fn checkWordBoundary(self: *Executor, pos: usize) bool {
         const before = if (pos == 0) false else isWordChar(self.input[pos - 1]);
         const after = if (pos >= self.input.len) false else isWordChar(self.input[pos]);
         return before != after;
     }
 };
+
+fn matchClass(class: compiler.Class, c: u8) bool {
+    var matched = false;
+
+    var i: usize = 0;
+    while (i < class.items.len) : (i += 1) {
+        const item = class.items[i];
+        switch (item) {
+            .char => |cp| {
+                if (cp <= 0x7F and @as(u8, @intCast(cp)) == c) {
+                    matched = true;
+                    break;
+                }
+            },
+            .range_start => |start| {
+                if (i + 1 < class.items.len) {
+                    const end_item = class.items[i + 1];
+                    if (end_item == .range_end) {
+                        const end = end_item.range_end;
+                        if (c >= start and c <= end) {
+                            matched = true;
+                            break;
+                        }
+                        i += 1;
+                    }
+                }
+            },
+            .digit => {
+                if (c >= '0' and c <= '9') {
+                    matched = true;
+                    break;
+                }
+            },
+            .not_digit => {
+                if (!(c >= '0' and c <= '9')) {
+                    matched = true;
+                    break;
+                }
+            },
+            .word => {
+                if (isWordChar(c)) {
+                    matched = true;
+                    break;
+                }
+            },
+            .not_word => {
+                if (!isWordChar(c)) {
+                    matched = true;
+                    break;
+                }
+            },
+            .space => {
+                if (isSpaceChar(c)) {
+                    matched = true;
+                    break;
+                }
+            },
+            .not_space => {
+                if (!isSpaceChar(c)) {
+                    matched = true;
+                    break;
+                }
+            },
+            .range_end => {},
+        }
+    }
+
+    if (class.negated) return !matched;
+    return matched;
+}
 
 pub fn execute(
     allocator: std.mem.Allocator,
@@ -303,7 +309,6 @@ pub fn execute(
     start: usize,
 ) ExecError!?ExecResult {
     var exec = Executor.init(allocator, program, input, options);
-    defer exec.deinit();
     return exec.exec(start);
 }
 

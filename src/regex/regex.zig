@@ -1,7 +1,7 @@
 const std = @import("std");
 const parser = @import("parser.zig");
 const compiler = @import("compiler.zig");
-const exec = @import("exec.zig");
+const exec_mod = @import("exec.zig");
 const match_mod = @import("match.zig");
 
 pub const Match = match_mod.Match;
@@ -76,8 +76,8 @@ pub const Regex = struct {
     allocator: std.mem.Allocator,
     last_index: usize,
 
-    pub fn compile(allocator: std.mem.Allocator, pattern: []const u8, flags: Flags) Error!Regex {
-        var parse_result = parser.parse(allocator, pattern) catch |err| {
+    pub fn compile(allocator: std.mem.Allocator, source_text: []const u8, flags: Flags) Error!Regex {
+        var parse_result = parser.parse(allocator, source_text) catch |err| {
             return switch (err) {
                 error.OutOfMemory => Error.OutOfMemory,
                 else => Error.SyntaxError,
@@ -85,7 +85,7 @@ pub const Regex = struct {
         };
         defer parse_result.deinit();
 
-        var program = compiler.compile(allocator, parse_result.root, parse_result.group_count) catch |err| {
+        const program = compiler.compile(allocator, parse_result.root, parse_result.group_count) catch |err| {
             return switch (err) {
                 error.OutOfMemory => Error.OutOfMemory,
                 else => Error.SyntaxError,
@@ -94,7 +94,7 @@ pub const Regex = struct {
 
         return .{
             .program = program,
-            .source = pattern,
+            .source = source_text,
             .flags = flags,
             .allocator = allocator,
             .last_index = 0,
@@ -105,7 +105,7 @@ pub const Regex = struct {
         self.program.deinit();
     }
 
-    fn execOptions(self: Regex) exec.Options {
+    fn execOptions(self: Regex) exec_mod.Options {
         return .{
             .multiline = self.flags.multiline,
             .dotall = self.flags.dotall,
@@ -126,7 +126,7 @@ pub const Regex = struct {
 
         var i = start;
         while (i <= input.len) {
-            const result = exec.execute(
+            const result = exec_mod.execute(
                 self.allocator,
                 &self.program,
                 input,
@@ -136,7 +136,10 @@ pub const Regex = struct {
                 return Error.RuntimeError;
             };
 
-            if (result) |r| {
+            if (result) |r_const| {
+                var r = r_const;
+                defer r.deinit(self.allocator);
+
                 var m = Match.init(self.allocator, 1 + self.program.group_count) catch {
                     return Error.OutOfMemory;
                 };
@@ -162,7 +165,7 @@ pub const Regex = struct {
         return null;
     }
 
-    pub fn test(self: *Regex, input: []const u8) Error!bool {
+    pub fn matches(self: *Regex, input: []const u8) Error!bool {
         const m = try self.exec(input);
         if (m) |match_result| {
             var mutable = match_result;
@@ -197,21 +200,21 @@ pub const Regex = struct {
     }
 
     pub fn findAll(self: *Regex, allocator: std.mem.Allocator, input: []const u8) Error![]Match {
-        var matches: std.ArrayList(Match) = .empty;
+        var result_list: std.ArrayList(Match) = .empty;
         errdefer {
-            for (matches.items) |*m| {
+            for (result_list.items) |*m| {
                 m.deinit();
             }
-            matches.deinit(allocator);
+            result_list.deinit(allocator);
         }
 
         var pos: usize = 0;
         while (pos <= input.len) {
-            const m = try self.execAt(input, pos);
-            if (m == null) break;
-            var match_val = m.?;
+            const maybe = try self.execAt(input, pos);
+            if (maybe == null) break;
+            const match_val = maybe.?;
             const end = match_val.end;
-            try matches.append(allocator, match_val);
+            try result_list.append(allocator, match_val);
             if (end == pos) {
                 pos += 1;
             } else {
@@ -220,7 +223,7 @@ pub const Regex = struct {
             if (!self.flags.global) break;
         }
 
-        return matches.toOwnedSlice(allocator);
+        return result_list.toOwnedSlice(allocator);
     }
 };
 
@@ -236,10 +239,10 @@ pub fn compileWithFlags(
     return Regex.compile(allocator, pattern, flags);
 }
 
-pub fn test(allocator: std.mem.Allocator, pattern: []const u8, input: []const u8) Error!bool {
+pub fn matches(allocator: std.mem.Allocator, pattern: []const u8, input: []const u8) Error!bool {
     var regex = try Regex.compile(allocator, pattern, .{});
     defer regex.deinit();
-    return regex.test(input);
+    return regex.matches(input);
 }
 
 test "regex compile simple" {
@@ -270,12 +273,12 @@ test "regex no match" {
     try std.testing.expect(m == null);
 }
 
-test "regex test helper" {
+test "regex matches helper" {
     var regex = try Regex.compile(std.testing.allocator, "\\d+", .{});
     defer regex.deinit();
 
-    try std.testing.expect(try regex.test("abc123"));
-    try std.testing.expect(!try regex.test("abcdef"));
+    try std.testing.expect(try regex.matches("abc123"));
+    try std.testing.expect(!try regex.matches("abcdef"));
 }
 
 test "regex groups" {
@@ -328,15 +331,15 @@ test "regex findAll" {
     var regex = try Regex.compile(std.testing.allocator, "\\d+", .{ .global = true });
     defer regex.deinit();
 
-    const matches = try regex.findAll(std.testing.allocator, "a1b2c3");
+    const found = try regex.findAll(std.testing.allocator, "a1b2c3");
     defer {
-        for (matches) |*m| {
+        for (found) |*m| {
             m.deinit();
         }
-        std.testing.allocator.free(matches);
+        std.testing.allocator.free(found);
     }
 
-    try std.testing.expectEqual(@as(usize, 3), matches.len);
+    try std.testing.expectEqual(@as(usize, 3), found.len);
 }
 
 test "regex last index" {
@@ -399,7 +402,7 @@ test "regex compile helper" {
     try std.testing.expectEqualStrings("test", regex.pattern());
 }
 
-test "regex test function" {
-    const result = try test(std.testing.allocator, "\\d+", "abc123");
+test "regex matches top level" {
+    const result = try matches(std.testing.allocator, "\\d+", "abc123");
     try std.testing.expect(result);
 }
