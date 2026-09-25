@@ -50,4 +50,17 @@ test {
     _ = @import("values/reference.zig");
     _ = @import("objects/key.zig");
     _ = @import("objects/property.zig");
+    _ = @import("objects/descriptor.zig");
+    _ = @import("objects/prototype.zig");
+    _ = @import("objects/slot.zig");
+    _ = @import("objects/object.zig");
+    _ = @import("objects/proxy.zig");
+    _ = @import("objects/class.zig");
+    _ = @import("functions/function.zig");
+    _ = @import("functions/closure.zig");
+    _ = @import("functions/native.zig");
+    _ = @import("functions/arrow.zig");
+    _ = @import("functions/generator.zig");
+    _ = @import("functions/async.zig");
+    _ = @import("functions/bind.zig");
 }
