@@ -139,14 +139,19 @@ pub fn swapBytes64(x: u64) u64 {
 }
 
 pub fn signExtend(comptime T: type, value: u64, bits: u32) T {
-    if (bits == 0 or bits >= @bitSizeOf(u64)) return @bitCast(value);
-    const sign_bit = @as(u64, 1) << @as(u6, @intCast(bits - 1));
-    const mask = (@as(u64, 1) << @as(u6, @intCast(bits))) - 1;
-    const v = value & mask;
-    if ((v & sign_bit) != 0) {
-        return @bitCast(v | ~mask);
+    const T_bits = @bitSizeOf(T);
+    const U = std.meta.Int(.unsigned, T_bits);
+
+    if (bits == 0 or bits >= T_bits) {
+        const truncated: U = @truncate(value);
+        return @bitCast(truncated);
     }
-    return @bitCast(v);
+
+    const shift: u6 = @intCast(64 - bits);
+    const wide = value << shift;
+    const as_signed: i64 = @bitCast(wide);
+    const sign_extended = as_signed >> shift;
+    return @intCast(sign_extended);
 }
 
 test "popCount basics" {
@@ -189,11 +194,11 @@ test "testBit" {
 test "setBit" {
     try std.testing.expectEqual(@as(u32, 1), setBit(@as(u32, 0), 0));
     try std.testing.expectEqual(@as(u32, 32), setBit(@as(u32, 0), 5));
-    try std.testing.expectEqual(@as(u32, 0xFFFF), setBit(@as(u32, 0xFF), 8));
+    try std.testing.expectEqual(@as(u32, 0x1FF), setBit(@as(u32, 0xFF), 8));
 }
 
 test "clearBit" {
-    try std.testing.expectEqual(@as(u32, 0xFF), clearBit(@as(u32, 0xFF), 0));
+    try std.testing.expectEqual(@as(u32, 0xFE), clearBit(@as(u32, 0xFF), 0));
     try std.testing.expectEqual(@as(u32, 0xFE), clearBit(@as(u32, 0xFF), 0));
     try std.testing.expectEqual(@as(u32, 0xF7), clearBit(@as(u32, 0xFF), 3));
 }
