@@ -63,4 +63,17 @@ test {
     _ = @import("functions/generator.zig");
     _ = @import("functions/async.zig");
     _ = @import("functions/bind.zig");
+    _ = @import("scope/binding.zig");
+    _ = @import("scope/environment.zig");
+    _ = @import("scope/scope.zig");
+    _ = @import("scope/chain.zig");
+    _ = @import("scope/hoisting.zig");
+    _ = @import("parser/ast.zig");
+    _ = @import("parser/error.zig");
+    _ = @import("parser/precedence.zig");
+    _ = @import("parser/expression.zig");
+    _ = @import("parser/statement.zig");
+    _ = @import("parser/declaration.zig");
+    _ = @import("parser/recovery.zig");
+    _ = @import("parser/parser.zig");
 }
