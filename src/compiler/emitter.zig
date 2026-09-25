@@ -513,7 +513,7 @@ test "Emitter jump and patch" {
     try e.patchJump(jump_idx);
 
     const inst = f.instructions.items[jump_idx];
-    try std.testing.expectEqual(@as(JumpOffset, 3), inst.asJumpOffset().?);
+    try std.testing.expectEqual(@as(JumpOffset, 2), inst.asJumpOffset().?);
 }
 
 test "Emitter beginLoop and endLoop" {

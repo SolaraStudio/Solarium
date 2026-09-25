@@ -1,3 +1,3 @@
 test {
-    _ = @import("compiler/compiler.zig");
+    _ = @import("vm/vm.zig");
 }

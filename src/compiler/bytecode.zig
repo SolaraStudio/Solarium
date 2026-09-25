@@ -440,7 +440,8 @@ pub const Function = struct {
         if (index >= self.instructions.items.len) return error.InvalidJump;
         const inst = &self.instructions.items[index];
         if (!inst.isJump()) return error.InvalidJump;
-        const offset = @as(i32, @intCast(target)) - @as(i32, @intCast(inst.offset));
+        const next_ip = inst.offset + 1;
+        const offset = @as(i32, @intCast(target)) - @as(i32, @intCast(next_ip));
         inst.operand = .{ .jump = offset };
     }
 
@@ -791,7 +792,7 @@ test "Function patchJump" {
     const idx = try f.addInstruction(Instruction.withJump(.jump, 0));
     try f.patchJump(idx, 10);
     const inst = f.instructions.items[idx];
-    try std.testing.expectEqual(@as(JumpOffset, 10), inst.asJumpOffset().?);
+    try std.testing.expectEqual(@as(JumpOffset, 9), inst.asJumpOffset().?);
 }
 
 test "Function patchJump invalid" {

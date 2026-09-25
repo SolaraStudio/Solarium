@@ -82,4 +82,11 @@ test {
     _ = @import("compiler/emitter.zig");
     _ = @import("compiler/optimizer.zig");
     _ = @import("compiler/compiler.zig");
+    _ = @import("vm/stack.zig");
+    _ = @import("vm/frame.zig");
+    _ = @import("vm/call.zig");
+    _ = @import("vm/return.zig");
+    _ = @import("vm/exception.zig");
+    _ = @import("vm/dispatch.zig");
+    _ = @import("vm/vm.zig");
 }
