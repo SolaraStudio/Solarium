@@ -9,6 +9,8 @@ zig-out/
 *.dll
 *.lib
 *.obj
+src/test_all.zig
+src/test_tmp.zig
 
 # Build artifacts
 build/
